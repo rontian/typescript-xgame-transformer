@@ -113,21 +113,33 @@ export function createTransformer(program: ts.Program, options: IOptions) {
             }
             return false;
         }
+        const createDecoratorCallExpressionIdentifier = (classDecorator: string) => {
+            let paths = classDecorator.split('.');
+            if (paths.length == 1) {
+                return context.factory.createIdentifier(classDecorator);
+            }
+            else {
+                paths = paths.reverse();
+                let finalExpression: ts.Expression = context.factory.createIdentifier(paths[0]);
+                for (let i = 1; i < paths.length; i++) {
+                    let currentExpression = context.factory.createPropertyAccessExpression(finalExpression, paths[i]);
+                    finalExpression = currentExpression;
+                }
+                return finalExpression;
+            }
+        };
         /**
          * 创建类名的装饰器
          * @param node 
          * @returns 
          */
         const createClassDecorator = (node: ts.ClassDeclaration): ts.ClassDeclaration | undefined => {
-            if (hasClassDecorator(node)) {
-                return undefined;
-            }
             let names = getClassParentModules(node);
             if (node.name) {
                 names.push(node.name.getText());
             }
             let className = names.join(".");
-            const identifier = context.factory.createIdentifier(options.classDecorator);
+            const identifier = createDecoratorCallExpressionIdentifier(options.classDecorator);
             const classArguments: ts.StringLiteral[] = [];
             classArguments.push(context.factory.createStringLiteral(className))
             let interfaceNames = getClassInterfaces(node);
@@ -143,18 +155,14 @@ export function createTransformer(program: ts.Program, options: IOptions) {
                 decorators.push(...node.decorators);
             }
             decorators.push(decorator);
-            return context.factory.updateClassDeclaration(node, decorators, node.modifiers, node.name, node.typeParameters, node.heritageClauses, node.members);
+            return context.factory.createClassDeclaration(decorators, node.modifiers, node.name, node.typeParameters, node.heritageClauses, node.members);
         }
         const transformer = (sourceFile: ts.SourceFile) => {
-            const transformNode = (rootNode: ts.Node): ts.Node | undefined => {
-                const node = ts.visitEachChild(rootNode, visitor, context);
-                if (ts.isClassDeclaration(node)) {
-                    const update = createClassDecorator(node);
-                    if (update) {
-                        return update;
-                    }
+            const transformNode = (node: ts.Node): ts.Node | undefined => {
+                if (ts.isClassDeclaration(node) && !hasClassDecorator(node)) {
+                    return createClassDecorator(node);
                 }
-                return node;
+                return ts.visitEachChild(node, visitor, context);
             }
             const visitor: ts.Visitor = (node) => transformNode(node);
             return ts.visitNode(sourceFile, visitor);
