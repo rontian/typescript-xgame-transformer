@@ -138,15 +138,23 @@ function createTransformer(program, options) {
             }
             const callExpression = context.factory.createCallExpression(identifier, undefined, classArguments);
             const decorator = context.factory.createDecorator(callExpression);
-            const decorators = [decorator];
+            const decorators = [];
+            if (node.decorators && node.decorators.length) {
+                decorators.push(...node.decorators);
+            }
+            decorators.push(decorator);
             return context.factory.updateClassDeclaration(node, decorators, node.modifiers, node.name, node.typeParameters, node.heritageClauses, node.members);
         };
         const transformer = (sourceFile) => {
-            const transformNode = (node) => {
+            const transformNode = (rootNode) => {
+                const node = ts.visitEachChild(rootNode, visitor, context);
                 if (ts.isClassDeclaration(node)) {
-                    return createClassDecorator(node);
+                    const update = createClassDecorator(node);
+                    if (update) {
+                        return update;
+                    }
                 }
-                return ts.visitEachChild(node, visitor, context);
+                return node;
             };
             const visitor = (node) => transformNode(node);
             return ts.visitNode(sourceFile, visitor);
