@@ -119,7 +119,6 @@ function createTransformer(program, options) {
                 return context.factory.createIdentifier(classDecorator);
             }
             else {
-                paths = paths.reverse();
                 let finalExpression = context.factory.createIdentifier(paths[0]);
                 for (let i = 1; i < paths.length; i++) {
                     let currentExpression = context.factory.createPropertyAccessExpression(finalExpression, paths[i]);
